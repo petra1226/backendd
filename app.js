@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const { error } = require('console');
 
 const app = express();
 
@@ -66,6 +67,7 @@ const upload = multer({
 const JWT_SECRET = process.env.JWT_SECRET;
 function authenticateToken(req, res, next) {
     const token = req.cookies.auth_token;
+    console.log(token);
 
     if (!token) {
         return res.status(403).json({ error: 'Nincsen tokened' });
@@ -83,6 +85,7 @@ function authenticateToken(req, res, next) {
 
 function authorizeAdmin(req, res, next) {
     const user_id = req.user.id;
+    console.log(user_id);
 
     const sqlCheckAdmin = 'SELECT is_admin FROM users WHERE user_id = ?';
     pool.query(sqlCheckAdmin, [user_id], (err, result) => {
@@ -113,15 +116,20 @@ app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uplo
 
 // Regisztráció
 app.post('/api/register', (req, res) => {
-    const { email, username, psw } = req.body;
+    const { email, firstname, lastname, psw } = req.body;
     const errors = [];
+    console.log(errors);
 
     if (!validator.isEmail(email)) {
         errors.push({ error: 'Nem valós email' });
     }
 
-    if (validator.isEmpty(username)) {
-        errors.push({ error: 'Töltsd ki a nevet ' });
+    if (validator.isEmpty(firstname)) {
+        errors.push({ error: 'Töltsd ki a keresztnevet' });
+    }
+
+    if (validator.isEmpty(lastname)) {
+        errors.push({ error: 'Töltsd ki a vezetéknevet' });
     }
 
     if (!validator.isLength(psw, { min: 6 })) {
@@ -138,8 +146,8 @@ app.post('/api/register', (req, res) => {
             return res.status(500).json({ error: 'Hiba a sózáskor' });
         }
 
-        const sql = 'INSERT INTO users (email, username, psw, user_picture) VALUES (?, ?, ?, ?)';
-        pool.query(sql, [email, username, hash, 'default.png'], (err2, result) => {
+        const sql = 'INSERT INTO users (email, firstname, lastname, psw, user_picture) VALUES (?, ?, ?, ?, ?)';
+        pool.query(sql, [email, firstname, lastname, hash, 'default.png'], (err2, result) => {
             if (err2) {
                 return res.status(500).json({ error: 'Az email már foglalt' });
             }
@@ -153,6 +161,8 @@ app.post('/api/register', (req, res) => {
 app.post('/api/login', (req, res) => {
     const { email, psw } = req.body;
     const errors = [];
+    console.log(errors);
+
 
     if (!validator.isEmail(email)) {
         errors.push({ error: 'Add meg az email címet' });
