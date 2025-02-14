@@ -1,6 +1,6 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
@@ -19,6 +19,7 @@ const HOSTNAME = process.env.HOSTNAME;
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
@@ -79,12 +80,26 @@ function authenticateToken(req, res, next) {
     });
 };
 
+
 function authorizeAdmin(req, res, next) {
-    if (!req.user.is_admin) {
-        return res.status(403).json({ error: 'Nincs admin jogosultságod' });
-    }
-    next();
+    const user_id = req.user.id;
+
+    const sqlCheckAdmin = 'SELECT is_admin FROM users WHERE user_id = ?';
+    pool.query(sqlCheckAdmin, [user_id], (err, result) => {
+        if (err) {
+            console.error('SQL hiba:', err);
+            return res.status(500).json({ error: 'Hiba az SQL-ben' });
+        }
+
+        if (result.length === 0 || result[0].is_admin !== 1) {
+            return res.status(403).json({ error: 'Nincs admin jogosultságod' });
+        }
+
+        next();
+    });
 }
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
@@ -96,9 +111,7 @@ app.use(cors({
 
 app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uploads')));
 
-
-
-//regisztráció
+// Regisztráció
 app.post('/api/register', (req, res) => {
     const { email, username, psw } = req.body;
     const errors = [];
@@ -125,8 +138,8 @@ app.post('/api/register', (req, res) => {
             return res.status(500).json({ error: 'Hiba a sózáskor' });
         }
 
-        const sql = 'INSERT INTO users (user_id, email, username, psw) VALUES (NULL, ?, ?, ?)';
-        pool.query(sql, [email, username, hash], (err2, result) => {
+        const sql = 'INSERT INTO users (email, username, psw, user_picture) VALUES (?, ?, ?, ?)';
+        pool.query(sql, [email, username, hash, 'default.png'], (err2, result) => {
             if (err2) {
                 return res.status(500).json({ error: 'Az email már foglalt' });
             }
@@ -136,8 +149,7 @@ app.post('/api/register', (req, res) => {
     });
 });
 
-
-// bejelentkezés
+// Bejelentkezés
 app.post('/api/login', (req, res) => {
     const { email, psw } = req.body;
     const errors = [];
@@ -184,7 +196,6 @@ app.post('/api/login', (req, res) => {
                     sameSite: 'none',
                     maxAge: 3600000 * 24 * 31 * 12
                 });
-                
 
                 return res.status(200).json({ message: 'Sikeres bejelentkezés' });
             } else {
@@ -194,16 +205,14 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-
-//termék keresése
-app.get('/products/:search', (req, res) => {
- 
+// Termék keresése
+app.get('/api/products/:search', (req, res) => {
     const { search } = req.params;
 
     const keres = `%${search}%`;
-    const sql = 'SELECT * FROM uploads WHERE name LIKE ? OR price LIKE ?';
+    const sql = 'SELECT * FROM products WHERE product_name LIKE ? OR price LIKE ?';
 
-    db.query(sql, [keres, keres], (err, result) => {
+    pool.query(sql, [keres, keres], (err, result) => {
         if (err) {
             console.error(err);
             return res.status(500).send({ error: 'Adatbázis hiba' });
@@ -213,25 +222,21 @@ app.get('/products/:search', (req, res) => {
     });
 });
 
-
-// teszt végpont
+// Teszt végpont
 app.get('/api/teszt', authenticateToken, (req, res) => {
     const user = req.user;
     return res.status(200).json({ message: 'bent vagy ', user });
 });
 
-
-// profil név szerkesztése
+// Profil név szerkesztése
 app.put('/api/editProfileName', authenticateToken, (req, res) => {
     console.log('Token info:', req.user);  // Ellenőrizd, hogy megjelenik-e a token
-    const firstname = req.body.firstname;
-    const surname = req.body.surname;
+    const username = req.body.username;
     const user_id = req.user.id;
 
-    const sql = 'UPDATE users SET firstname = COALESCE(NULLIF(?, ""), firstname), surname = COALESCE(NULLIF(?, ""), surname) WHERE user_id = ?';
+    const sql = 'UPDATE users SET username = COALESCE(NULLIF(?, ""), username) WHERE user_id = ?';
 
-
-    pool.query(sql, [firstname, surname, user_id], (err, result) => {
+    pool.query(sql, [username, user_id], (err, result) => {
         if (err) {
             return res.status(500).json({ error: 'Hiba az SQL-ben' });
         }
@@ -245,8 +250,36 @@ app.put('/api/editProfileName', authenticateToken, (req, res) => {
 });
 
 
-// jelszó módosítása
+// Profilkép módosítása
+app.put('/api/editProfilePicture', authenticateToken, upload.single('profile_picture'), (req, res) => {
+    const user_id = req.user.id;
+    const profile_picture = req.file ? req.file.filename : null; // Fájl neve
 
+    // Ellenőrizzük, hogy van-e fájl
+    if (!profile_picture) {
+        return res.status(400).json({ error: 'Nincs fájl feltöltve' });
+    }
+
+    // SQL lekérdezés a profilkép frissítéséhez
+    const sql = 'UPDATE users SET user_picture = ? WHERE user_id = ?';
+    pool.query(sql, [profile_picture, user_id], (err, result) => {
+        if (err) {
+            console.error('SQL hiba:', err);
+            return res.status(500).json({ error: 'Hiba a profilkép frissítésekor' });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Felhasználó nem található' });
+        }
+
+        return res.status(200).json({ message: 'Profilkép sikeresen frissítve', profile_picture });
+    });
+});
+
+
+
+
+// Jelszó módosítása
 app.put('/api/editProfilePsw', authenticateToken, (req, res) => {
     const psw = req.body.psw;
     const user_id = req.user.id;
@@ -274,17 +307,14 @@ app.put('/api/editProfilePsw', authenticateToken, (req, res) => {
     });
 });
 
-
-// új termék feltöltése
-
-app.post('/api/upload', authenticateToken, upload.single('product'), (req, res) => {
+// Termék feltöltése (csak adminok számára)
+app.post('/api/upload', authenticateToken, upload.single('product_image'), (req, res) => {
     const user_id = req.user.id;
 
-    // Ellenőrizzük, hogy admin-e
+    // Admin jogosultság ellenőrzése
     const sqlCheckAdmin = 'SELECT is_admin FROM users WHERE user_id = ?';
     pool.query(sqlCheckAdmin, [user_id], (err, result) => {
         if (err) {
-            console.error('SQL hiba:', err);
             return res.status(500).json({ error: 'Hiba az SQL-ben' });
         }
 
@@ -292,49 +322,30 @@ app.post('/api/upload', authenticateToken, upload.single('product'), (req, res) 
             return res.status(403).json({ error: 'Nincs admin jogosultságod' });
         }
 
-        // Ha admin, folytatódhat a termék feltöltése
-        const product = req.file ? req.file.filename : null;
-        const price = req.body.price;
+        // Mezők kinyerése
+        const { product_name, price, stock } = req.body;
+        const product_image = req.file ? req.file.filename : null; // Fájl neve
 
-        if (!product) {
-            return res.status(400).json({ error: 'Válassz ki egy képet' });
+        // Validáció
+        if (!product_name || !price || !stock || !product_image) {
+            return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
         }
 
-        if (!price || isNaN(price)) {
-            return res.status(400).json({ error: 'Érvénytelen ár megadva.' });
-        }
-
-        const sqlInsertProduct = 'INSERT INTO uploads (user_id, product, price) VALUES (?, ?, ?)';
-        pool.query(sqlInsertProduct, [user_id, product, price], (err2, result2) => {
+        // Termék beszúrása az adatbázisba
+        const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, price, stock) VALUES (?, ?, ?, ?)';
+        pool.query(sqlInsertProduct, [product_name, product_image, price, stock], (err2, result2) => {
             if (err2) {
-                console.error('SQL hiba:', err2);
                 return res.status(500).json({ error: 'Hiba az SQL-ben', details: err2.message });
             }
 
-            res.status(201).json({ message: 'Kép feltöltve', upload_id: result2.insertId });
+            res.status(201).json({ message: 'Termék feltöltve', product_id: result2.insertId });
         });
     });
 });
 
-
 // Termékek listázása
-app.get('/api/uploads', authenticateToken, (req, res) => {
-    const sql = 'SELECT * FROM uploads';
-    pool.query(sql, (err, results) => {
-        if (err) {
-            console.error('SQL hiba:', err);
-            return res.status(500).json({ error: 'Hiba az SQL-ben' });
-        }
-
-        res.status(200).json(results);
-    });
-});
-
-
-
-// Összes termék lekérése
 app.get('/api/products', (req, res) => {
-    const sql = 'SELECT * FROM uploads';
+    const sql = 'SELECT * FROM products';
 
     pool.query(sql, (err, result) => {
         if (err) {
@@ -342,45 +353,47 @@ app.get('/api/products', (req, res) => {
             return res.status(500).json({ error: 'Hiba a termékek lekérdezésekor' });
         }
 
-        // Ha sikerült lekérni a termékeket, visszaadjuk őket
         res.status(200).json(result);
     });
 });
 
+// Kosárba helyezés
+app.post('/api/cart/:product_id', authenticateToken, (req, res) => {
+    const user_id = req.user.id;
+    const product_id = req.params.product_id;
 
-//kosár
-app.post('/api/cart/:upload_id', authenticateToken, (req, res) => {
-    const user_id = req.user.id; // Felhasználó azonosítója a tokenből
-    const upload_id = req.params.upload_id; // Termék azonosítója a kérésből
-
-    // Ellenőrizzük, hogy az upload_id érvényes szám-e
-    if (isNaN(upload_id)) {
-        return res.status(400).json({ error: 'Érvénytelen termékazonosító (upload_id)' });
+    if (isNaN(product_id)) {
+        return res.status(400).json({ error: 'Érvénytelen termékazonosító' });
     }
 
-    // Ellenőrizzük, hogy a termék már a kosárban van-e
-    const sqlSelect = 'SELECT * FROM cart WHERE upload_id = ? AND user_id = ?';
-    pool.query(sqlSelect, [upload_id, user_id], (err, result) => {
-        if (err) {
-            console.error('SQL Hiba a kosár ellenőrzésekor:', err);
-            return res.status(500).json({ error: 'Hiba a kosár ellenőrzése során' });
-        }
+    const sqlSelect = 'SELECT * FROM cart_items WHERE product_id = ? AND cart_item_id IN (SELECT cart_id FROM cart WHERE user_id = ?)';
+pool.query(sqlSelect, [product_id, user_id], (err, result) => {
+    if (err) {
+        console.error('SQL Hiba a kosár ellenőrzésekor:', err);
+        return res.status(500).json({ error: 'Hiba a kosár ellenőrzése során' });
+    }
 
-        if (result.length > 0) {
-            // Ha már létezik a termék a kosárban, növeljük a mennyiségét
-            const sqlUpdate = 'UPDATE cart SET quantity = quantity + 1 WHERE upload_id = ? AND user_id = ?';
-            pool.query(sqlUpdate, [upload_id, user_id], (err, updateResult) => {
-                if (err) {
-                    console.error('SQL Hiba a termék mennyiségének frissítésekor:', err);
-                    return res.status(500).json({ error: 'Hiba a termék mennyiségének frissítése során' });
-                }
+    if (result.length > 0) {
+        const sqlUpdate = 'UPDATE cart_items SET quantity = quantity + 1 WHERE product_id = ? AND cart_item_id IN (SELECT cart_id FROM cart WHERE user_id = ?)';
+        pool.query(sqlUpdate, [product_id, user_id], (err, updateResult) => {
+            if (err) {
+                console.error('SQL Hiba a termék mennyiségének frissítésekor:', err);
+                return res.status(500).json({ error: 'Hiba a termék mennyiségének frissítése során' });
+            }
 
-                return res.status(200).json({ message: 'A termék mennyisége növelve a kosárban' });
-            });
-        } else {
-            // Ha még nincs a kosárban, hozzáadjuk újként
-            const sqlInsert = 'INSERT INTO cart (upload_id, user_id, quantity) VALUES (?, ?, 1)';
-            pool.query(sqlInsert, [upload_id, user_id], (err, insertResult) => {
+            return res.status(200).json({ message: 'A termék mennyisége növelve a kosárban' });
+        });
+    } else {
+        const sqlInsertCart = 'INSERT INTO cart (user_id) VALUES (?)';
+        pool.query(sqlInsertCart, [user_id], (err, cartResult) => {
+            if (err) {
+                console.error('SQL Hiba a kosár létrehozásakor:', err);
+                return res.status(500).json({ error: 'Hiba a kosár létrehozása során' });
+            }
+
+            const cart_id = cartResult.insertId;
+            const sqlInsertCartItem = 'INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, 1)';
+            pool.query(sqlInsertCartItem, [cart_id, product_id], (err, insertResult) => {
                 if (err) {
                     console.error('SQL Hiba a termék kosárba helyezésekor:', err);
                     return res.status(500).json({ error: 'Hiba a termék kosárba helyezése során' });
@@ -388,13 +401,11 @@ app.post('/api/cart/:upload_id', authenticateToken, (req, res) => {
 
                 return res.status(200).json({ message: 'A termék sikeresen kosárba került' });
             });
-        }
-    });
+        });
+    }
+});
 });
 
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
-
-app.listen(PORT, HOSTNAME, () => {
-    console.log(`IP: http://${HOSTNAME}:${PORT}`);
+app.listen(PORT, () => {
+    console.log(`IP: http://${HOSTNAME}  || PORT: ${PORT}`);
 });
