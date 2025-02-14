@@ -408,5 +408,5 @@ app.post('/api/cart/:product_id', authenticateToken, (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`IP: http://${HOSTNAME}  || PORT: ${PORT}`);
+    console.log(`IP: https://${HOSTNAME}  || PORT: ${PORT}`);
 });
