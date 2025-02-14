@@ -105,7 +105,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
 app.use(cookieParser());
 app.use(cors({
-    origin: ['http://127.0.0.1:5500', 'http://192.168.10.14:5500', 'http://localhost:5500'],
+    origin:'https://veca20.github.io',
     credentials: true
 }));
 
