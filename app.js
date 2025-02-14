@@ -241,12 +241,24 @@ app.get('/api/teszt', authenticateToken, (req, res) => {
 // Profil név szerkesztése
 app.put('/api/editProfileName', authenticateToken, (req, res) => {
     console.log('Token info:', req.user);  // Ellenőrizd, hogy megjelenik-e a token
-    const username = req.body.username;
+    const { firstname, lastname } = req.body;
     const user_id = req.user.id;
 
-    const sql = 'UPDATE users SET username = COALESCE(NULLIF(?, ""), username) WHERE user_id = ?';
+    // Ellenőrizzük, hogy legalább az egyik mező (firstname vagy lastname) meg van-e adva
+    if (!firstname && !lastname) {
+        return res.status(400).json({ error: 'Legalább egy névmezőt meg kell adni' });
+    }
 
-    pool.query(sql, [username, user_id], (err, result) => {
+    // SQL lekérdezés frissítése firstname és lastname mezőkre
+    const sql = `
+        UPDATE users 
+        SET 
+            firstname = COALESCE(NULLIF(?, ""), firstname),
+            lastname = COALESCE(NULLIF(?, ""), lastname)
+        WHERE user_id = ?
+    `;
+
+    pool.query(sql, [firstname, lastname, user_id], (err, result) => {
         if (err) {
             return res.status(500).json({ error: 'Hiba az SQL-ben' });
         }
@@ -264,6 +276,10 @@ app.put('/api/editProfileName', authenticateToken, (req, res) => {
 app.put('/api/editProfilePicture', authenticateToken, upload.single('profile_picture'), (req, res) => {
     const user_id = req.user.id;
     const profile_picture = req.file ? req.file.filename : null; // Fájl neve
+    console.log(user_id);
+    console.log(profile_picture);
+
+
 
     // Ellenőrizzük, hogy van-e fájl
     if (!profile_picture) {
@@ -293,6 +309,10 @@ app.put('/api/editProfilePicture', authenticateToken, upload.single('profile_pic
 app.put('/api/editProfilePsw', authenticateToken, (req, res) => {
     const psw = req.body.psw;
     const user_id = req.user.id;
+    console.log(psw);
+    console.log(user_id);
+
+
 
     const salt = 10;
 
