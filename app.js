@@ -108,7 +108,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
 app.use(cookieParser());
 app.use(cors({
-    origin:'https://veca20.github.io',
+    origin:['https://veca20.github.io', 'https://spectacular-blini-0de975.netlify.app'],
     credentials: true
 }));
 
