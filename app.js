@@ -118,6 +118,7 @@ app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uplo
 app.post('/api/register', (req, res) => {
     const { email, firstname, lastname, psw } = req.body;
     const errors = [];
+    console.log(email, firstname, lastname, psw );
     console.log(errors);
 
     if (!validator.isEmail(email)) {
