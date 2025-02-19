@@ -110,7 +110,8 @@ app.use(cookieParser());
 app.use(cors({
     origin:'https://spectacular-blini-0de975.netlify.app',
     credentials: true, 
-    methods:['GET','POST','PUT','DELETE']
+    methods:['GET','POST','PUT','DELETE'],
+    allowedHeaders:['Content-Type','Authorization']
 }));
 
 app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uploads')));
