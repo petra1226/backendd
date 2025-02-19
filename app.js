@@ -355,21 +355,26 @@ app.post('/api/upload', authenticateToken, upload.single('product_image'), (req,
 
         // Mezők kinyerése
         const { product_name, price, stock } = req.body;
-        const product_image = req.file ? req.file.filename : null; // Fájl neve
+        const product_image = req.file ? req.file.filename : null;
 
         // Validáció
         if (!product_name || !price || !stock || !product_image) {
             return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
         }
+    
+        if (isNaN(price) || isNaN(stock) || stock < 0) {
+            return res.status(400).json({ error: 'Érvénytelen ár vagy készlet' });
+        }
 
         // Termék beszúrása az adatbázisba
         const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, price, stock) VALUES (?, ?, ?, ?)';
-        pool.query(sqlInsertProduct, [product_name, product_image, price, stock], (err2, result2) => {
-            if (err2) {
-                return res.status(500).json({ error: 'Hiba az SQL-ben', details: err2.message });
+        pool.query(sqlInsertProduct, [product_name, product_image, price, stock], (err, result) => {
+            if (err) {
+                console.error('Hiba az SQL-ben:', err);
+                return res.status(500).json({ error: 'Hiba az SQL-ben', details: err.message });
             }
-
-            res.status(201).json({ message: 'Termék feltöltve', product_id: result2.insertId });
+    
+            res.status(201).json({ message: 'Termék feltöltve', product_id: result.insertId });
         });
     });
 });
