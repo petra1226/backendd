@@ -208,6 +208,7 @@ app.post('/api/login', (req, res) => {
                     secure: true,
                     sameSite: 'none',
                     maxAge: 3600000 * 24 * 31 * 12,
+                    domain:'spectacular-blini-0de975.netlify.app'
                 });
 
                 return res.status(200).json({ message: 'Sikeres bejelentkezés' });
