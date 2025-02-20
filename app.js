@@ -160,15 +160,13 @@ app.post('/api/register', (req, res) => {
     });
 });
 
-// Bejelentkezés
-app.post('/api/login', (req, res) => {
+// login
+const login = (req, res) => {
     const { email, psw } = req.body;
     const errors = [];
-    console.log(errors);
-
 
     if (!validator.isEmail(email)) {
-        errors.push({ error: 'Add meg az email címet' });
+        errors.push({ error: 'Add meg az email címet ' });
     }
 
     if (validator.isEmpty(psw)) {
@@ -180,45 +178,36 @@ app.post('/api/login', (req, res) => {
     }
 
     const sql = 'SELECT * FROM users WHERE email LIKE ?';
-    pool.query(sql, [email], (err, result) => {
+    db.query(sql, [email], (err, result) => {
         if (err) {
             return res.status(500).json({ error: 'Hiba az SQL-ben' });
         }
 
         if (result.length === 0) {
-            return res.status(404).json({ error: 'A felhasználó nem található' });
+            return res.status(404).json({ error: 'A felhasználó nem találató' });
         }
 
         const user = result[0];
         bcrypt.compare(psw, user.psw, (err, isMatch) => {
             if (isMatch) {
-                const token = jwt.sign(
-                    {
-                        id: user.user_id,
-                        is_admin: user.is_admin // Admin státusz a tokenben
-                    },
-                    JWT_SECRET,
-                    {
-                        expiresIn: '1y'
-                    }
-                );
-
+                const token = jwt.sign({ id: user.user_id }, JWT_SECRET, { expiresIn: '1y' });
+                console.log(token);
+                
                 res.cookie('auth_token', token, {
                     httpOnly: true,
                     secure: true,
                     sameSite: 'none',
-                    maxAge: 3600000 * 24 * 31 * 12,
-                    path:'/',
-                    domain:'revyn.netlify.app'
+                    maxAge: 1000 * 60 * 60 * 24 * 30 * 12
                 });
+                
 
                 return res.status(200).json({ message: 'Sikeres bejelentkezés' });
             } else {
-                return res.status(401).json({ error: 'Rossz a jelszó' });
+                return res.status(401).json({ error: 'rossz a jelszó' });
             }
         });
     });
-});
+};
 
 // Termék keresése
 app.get('/api/products/:search', (req, res) => {
@@ -342,44 +331,30 @@ app.put('/api/editProfilePsw', authenticateToken, (req, res) => {
     });
 });
 
+
 // Termék feltöltése (csak adminok számára)
-app.post('/api/upload', authenticateToken, upload.single('product_image'), (req, res) => {
-    const user_id = req.user.id;
+app.post('/api/upload', authenticateToken, authorizeAdmin, upload.single('product_image'), (req, res) => {
+    const { product_name, price, stock } = req.body;
+    const product_image = req.file ? req.file.filename : null;
 
-    // Admin jogosultság ellenőrzése
-    const sqlCheckAdmin = 'SELECT is_admin FROM users WHERE user_id = ?';
-    pool.query(sqlCheckAdmin, [user_id], (err, result) => {
+    // Validáció
+    if (!product_name || !price || !stock || !product_image) {
+        return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
+    }
+
+    if (isNaN(price) || isNaN(stock) || stock < 0) {
+        return res.status(400).json({ error: 'Érvénytelen ár vagy készlet' });
+    }
+
+    // Termék beszúrása az adatbázisba
+    const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, price, stock) VALUES (?, ?, ?, ?)';
+    pool.query(sqlInsertProduct, [product_name, product_image, price, stock], (err, result) => {
         if (err) {
-            return res.status(500).json({ error: 'Hiba az SQL-ben' });
+            console.error('Hiba az SQL-ben:', err);
+            return res.status(500).json({ error: 'Hiba az SQL-ben', details: err.message });
         }
 
-        if (result.length === 0 || result[0].is_admin !== 1) {
-            return res.status(403).json({ error: 'Nincs admin jogosultságod' });
-        }
-
-        // Mezők kinyerése
-        const { product_name, price, stock } = req.body;
-        const product_image = req.file ? req.file.filename : null;
-
-        // Validáció
-        if (!product_name || !price || !stock || !product_image) {
-            return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
-        }
-    
-        if (isNaN(price) || isNaN(stock) || stock < 0) {
-            return res.status(400).json({ error: 'Érvénytelen ár vagy készlet' });
-        }
-
-        // Termék beszúrása az adatbázisba
-        const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, price, stock) VALUES (?, ?, ?, ?)';
-        pool.query(sqlInsertProduct, [product_name, product_image, price, stock], (err, result) => {
-            if (err) {
-                console.error('Hiba az SQL-ben:', err);
-                return res.status(500).json({ error: 'Hiba az SQL-ben', details: err.message });
-            }
-    
-            res.status(201).json({ message: 'Termék feltöltve', product_id: result.insertId });
-        });
+        res.status(201).json({ message: 'Termék feltöltve', product_id: result.insertId });
     });
 });
 
