@@ -197,7 +197,7 @@ app.post('/api/login', (req, res) => {
                     httpOnly: true,
                     secure: true,
                     sameSite: 'lax',
-                    maxAge: 1000 * 60 * 60 * 24 * 30 * 12
+                    maxAge: 1000 * 60 * 60 * 24 * 10
                 });
                 
 
