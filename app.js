@@ -164,6 +164,7 @@ app.post('/api/register', (req, res) => {
 app.post('/api/login', (req, res) => {
     const { email, psw } = req.body;
     const errors = [];
+    console.log(email, psw);
 
     if (!validator.isEmail(email)) {
         errors.push({ error: 'Add meg az email címet ' });
@@ -180,14 +181,16 @@ app.post('/api/login', (req, res) => {
     const sql = 'SELECT * FROM users WHERE email LIKE ?';
     pool.query(sql, [email], (err, result) => {
         if (err) {
+            console.log(err);
             return res.status(500).json({ error: 'Hiba az SQL-ben' });
         }
 
         if (result.length === 0) {
             return res.status(404).json({ error: 'A felhasználó nem találató' });
         }
-
+        
         const user = result[0];
+        console.log(user);
         bcrypt.compare(psw, user.psw, (err, isMatch) => {
             if (isMatch) {
                 const token = jwt.sign({ id: user.user_id }, JWT_SECRET, { expiresIn: '1y' });
