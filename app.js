@@ -178,7 +178,7 @@ app.post('/api/login', (req, res) => {
     }
 
     const sql = 'SELECT * FROM users WHERE email LIKE ?';
-    db.query(sql, [email], (err, result) => {
+    pool.query(sql, [email], (err, result) => {
         if (err) {
             return res.status(500).json({ error: 'Hiba az SQL-ben' });
         }
