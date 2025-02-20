@@ -161,7 +161,7 @@ app.post('/api/register', (req, res) => {
 });
 
 // login
-const login = (req, res) => {
+app.post('/api/login', (req, res) => {
     const { email, psw } = req.body;
     const errors = [];
 
@@ -207,7 +207,7 @@ const login = (req, res) => {
             }
         });
     });
-};
+});
 
 // Termék keresése
 app.get('/api/products/:search', (req, res) => {
