@@ -108,7 +108,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
 app.use(cookieParser());
 app.use(cors({
-    origin:'https://spectacular-blini-0de975.netlify.app',
+    origin:'https://revyn.netlify.app',
     credentials: true, 
     methods:['GET','POST','PUT','DELETE'],
     allowedHeaders:['Content-Type','Authorization']
