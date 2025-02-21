@@ -108,7 +108,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
 app.use(cookieParser());
 app.use(cors({
-    origin:'https://revyn.netlify.app',
+    //origin:'https://revyn.netlify.app',
+    origin:'https://veca20.github.io',
     credentials: true, 
     methods:['GET','POST','PUT','DELETE'],
     allowedHeaders:['Content-Type','Authorization']
