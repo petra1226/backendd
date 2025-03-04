@@ -160,6 +160,7 @@ app.post('/api/register', (req, res) => {
 });
 
 // login
+// login
 app.post('/api/login', (req, res) => {
     const { email, psw } = req.body;
     const errors = [];
@@ -185,7 +186,7 @@ app.post('/api/login', (req, res) => {
         }
 
         if (result.length === 0) {
-            return res.status(404).json({ error: 'A felhasználó nem találató' });
+            return res.status(404).json({ error: 'A felhasználó nem található' });
         }
         
         const user = result[0];
@@ -201,11 +202,15 @@ app.post('/api/login', (req, res) => {
                     sameSite: 'none',
                     maxAge: 1000 * 60 * 60 * 24 * 10
                 });
-                
 
-                return res.status(200).json({ message: 'Sikeres bejelentkezés' });
+                // Ellenőrizzük, hogy a felhasználó admin-e
+                if (user.is_admin === 1) {
+                    return res.status(200).json({ message: 'Sikeres bejelentkezés adminként', isAdmin: true });
+                } else {
+                    return res.status(200).json({ message: 'Sikeres bejelentkezés', isAdmin: false });
+                }
             } else {
-                return res.status(401).json({ error: 'rossz a jelszó' });
+                return res.status(401).json({ error: 'Rossz a jelszó' });
             }
         });
     });
