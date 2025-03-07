@@ -160,7 +160,6 @@ app.post('/api/register', (req, res) => {
 });
 
 // login
-// login
 app.post('/api/login', (req, res) => {
     const { email, psw } = req.body;
     const errors = [];
@@ -221,9 +220,9 @@ app.get('/api/products/:search', (req, res) => {
     const { search } = req.params;
 
     const keres = `%${search}%`;
-    const sql = 'SELECT * FROM products WHERE product_name LIKE ? OR product_price LIKE ?';
+    const sql = 'SELECT * FROM products WHERE product_name LIKE ? OR product_price LIKE ? OR product_description LIKE ?';
 
-    pool.query(sql, [keres, keres], (err, result) => {
+    pool.query(sql, [keres, keres, keres], (err, result) => {
         if (err) {
             console.error(err);
             return res.status(500).send({ error: 'Adatbázis hiba' });
@@ -341,21 +340,21 @@ app.put('/api/editProfilePsw', authenticateToken, (req, res) => {
 
 // Termék feltöltése (csak adminok számára)
 app.post('/api/upload', authenticateToken, authorizeAdmin, upload.single('product_image'), (req, res) => {
-    const { product_name, product_price, stock } = req.body;
+    const { product_name, product_price, product_stock, product_description } = req.body; 
     const product_image = req.file ? req.file.filename : null;
 
     // Validáció
-    if (!product_name || !product_price || !stock || !product_image) {
+    if (!product_name || !product_price || !product_stock || !product_image || !product_description) { 
         return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
     }
 
-    if (isNaN(product_price) || isNaN(stock) || stock < 0) {
+    if (isNaN(product_price) || isNaN(product_stock) || product_stock < 0) {
         return res.status(400).json({ error: 'Érvénytelen ár vagy készlet' });
     }
 
     // Termék beszúrása az adatbázisba
-    const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, product_price, stock) VALUES (?, ?, ?, ?)';
-    pool.query(sqlInsertProduct, [product_name, product_image, product_price, stock], (err, result) => {
+    const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, product_price, product_stock, product_description) VALUES (?, ?, ?, ?, ?)';
+    pool.query(sqlInsertProduct, [product_name, product_image, product_price, product_stock, product_description], (err, result) => {
         if (err) {
             console.error('Hiba az SQL-ben:', err);
             return res.status(500).json({ error: 'Hiba az SQL-ben', details: err.message });
