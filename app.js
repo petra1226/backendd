@@ -189,6 +189,9 @@ app.post('/api/login', (req, res) => {
         }
         
         const user = result[0];
+        const is_admin = user.is_admin;
+        console.log(`Admin-e: ${is_admin}`);
+        
         console.log(user);
         bcrypt.compare(psw, user.psw, (err, isMatch) => {
             if (isMatch) {
@@ -203,10 +206,10 @@ app.post('/api/login', (req, res) => {
                 });
 
                 // Ellenőrizzük, hogy a felhasználó admin-e
-                if (user.is_admin === 1) {
-                    return res.status(200).json({ message: 'Sikeres bejelentkezés adminként', isAdmin: true });
+                if (is_admin === 1) {
+                    return res.status(200).json({ message: 'Sikeres bejelentkezés adminként', is_admin });
                 } else {
-                    return res.status(200).json({ message: 'Sikeres bejelentkezés', isAdmin: false });
+                    return res.status(200).json({ message: 'Sikeres bejelentkezés', is_admin });
                 }
             } else {
                 return res.status(401).json({ error: 'Rossz a jelszó' });
