@@ -209,7 +209,7 @@ app.post('/api/login', (req, res) => {
                 if (is_admin === 1) {
                     return res.status(200).json({ message: 'Sikeres bejelentkezés adminként', is_admin });
                 } else {
-                    return res.status(200).json({ message: 'Sikeres bejelentkezés', is_admin });
+                    return res.status(200).json({ message: 'Sikeres bejelentkezés', is_admin }); 
                 }
             } else {
                 return res.status(401).json({ error: 'Rossz a jelszó' });
