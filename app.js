@@ -455,12 +455,11 @@ function addToCart(cart_id, product_id, res) {
 */
 
 //rendelés rögzítése
-app.post('/api/orders/', authenticateToken, (req, res) => {
+app.post('/api/orders/', authenticateToken, async(req, res) => {
     const user_id = req.user.id;
 
     // Kiolvassuk a többi adatot a body-ból
-    const { total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart } = req.body;
-    console.log(total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart);
+    const { first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart } = req.body;
     
     // Ellenőrizzük, hogy a cart valóban egy tömb
     if (!Array.isArray(cart) || cart.length === 0) {
@@ -469,7 +468,6 @@ app.post('/api/orders/', authenticateToken, (req, res) => {
 
     console.log("Beérkezett rendelési adatok:", {
         user_id,
-        total,
         first_name,
         last_name,
         address,
@@ -479,6 +477,48 @@ app.post('/api/orders/', authenticateToken, (req, res) => {
         name_on_card,
         cart
     });
+
+    let connection;
+    try {
+        connection = await pool.getConnection();  // Poolból kapcsolat lekérése
+        await connection.beginTransaction();  // Tranzakció indítása
+
+        // Rendelés teljes összegének kiszámítása
+        let total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+        // 1. Lépés: Rendelés beszúrása az `orders` táblába
+        const [orderResult] = await connection.execute(
+            `INSERT INTO orders (user_id, total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [user_id, total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card]
+        );
+        const order_id = orderResult.insertId;
+
+        // 2. Lépés: Kosár tételeinek beszúrása az `order_items` táblába
+        for (let item of cart) {
+            const [orderItemResult] = await connection.execute(
+                `INSERT INTO order_items (product_id, quantity, price) VALUES (?, ?, ?)`,
+                [item.product_id, item.quantity, item.price]
+            );
+            const order_item_id = orderItemResult.insertId;
+
+            // 3. Lépés: Az orders táblában frissítjük az order_item_id mezőt az első termékkel
+            await connection.execute(
+                `UPDATE orders SET order_item_id = ? WHERE order_id = ?`,
+                [order_item_id, order_id]
+            );
+        }
+
+        await connection.commit(); // Tranzakció véglegesítése
+        res.json({ message: "Rendelés sikeresen rögzítve!", order_id, total });
+
+    } catch (error) {
+        if (connection) await connection.rollback(); // Hibakezelés: visszavonás
+        console.error("Hiba a rendelés rögzítésénél:", error);
+        res.status(500).json({ error: "Hiba történt a rendelés rögzítése közben." });
+    } finally {
+        if (connection) connection.release(); // Kapcsolat visszaadása a pool-ba
+    }
 
     // Példa: Rendelések mentése adatbázisba (MongoDB, MySQL, stb.)
     // db.saveOrder({ user_id, total, first_name, last_name, address, phone_number, cart });
