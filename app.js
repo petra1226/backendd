@@ -166,7 +166,7 @@ app.post('/api/login', async (req, res) => {
 
         const user = users[0];
         const isMatch = await bcrypt.compare(psw, user.psw);
-
+        const is_admin = user.is_admin;
         if (!isMatch) {
             return res.status(401).json({ error: 'Rossz a jelszó' });
         }
@@ -182,7 +182,7 @@ app.post('/api/login', async (req, res) => {
             maxAge: 3600000 * 24 * 31 * 11
         });
 
-        return res.json({ message: 'Sikeres bejelentkezés' });
+        return res.json({ message: 'Sikeres bejelentkezés', is_admin });
 
     } catch (error) {
         console.error("Hiba a bejelentkezés során:", error);
