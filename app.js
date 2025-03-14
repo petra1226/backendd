@@ -83,25 +83,29 @@ function authenticateToken(req, res, next) {
 };
 
 
-function authorizeAdmin(req, res, next) {
-    const user_id = req.user.id;
-    console.log(user_id);
+async function authorizeAdmin(req, res, next) {
+    try {
+        const user_id = req.user.id;
+        console.log("Bejelentkezett user_id:", user_id);
 
-    const sqlCheckAdmin = 'SELECT is_admin FROM users WHERE user_id = ?';
-    pool.query(sqlCheckAdmin, [user_id], (err, result) => {
-        if (err) {
-            console.error('SQL hiba:', err);
-            return res.status(500).json({ error: 'Hiba az SQL-ben' });
-        }
+        const sqlCheckAdmin = 'SELECT is_admin FROM users WHERE user_id = ?';
 
-        if (result.length === 0 || result[0].is_admin !== 1) {
+        // 🔄 Az `await pool.execute()` visszaad egy tömböt, amelyben az első elem a sorok listája
+        const [rows] = await pool.execute(sqlCheckAdmin, [user_id]);
+
+        // Ha nincs ilyen felhasználó, vagy nem admin (is_admin ≠ 1), akkor nincs jogosultság
+        if (rows.length === 0 || rows[0].is_admin !== 1) {
             return res.status(403).json({ error: 'Nincs admin jogosultságod' });
         }
 
+        // Ha admin, akkor mehet tovább a következő middleware-re vagy végpontra
         next();
-    });
-}
 
+    } catch (error) {
+        console.error('SQL hiba az admin jogosultság ellenőrzésénél:', error);
+        res.status(500).json({ error: 'Szerverhiba történt az admin ellenőrzése során.' });
+    }
+}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -115,48 +119,38 @@ app.use(cors({
 
 app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uploads')));
 
-// Regisztráció
-app.post('/api/register', (req, res) => {
-    const { email, firstname, lastname, psw } = req.body;
-    const errors = [];
-    console.log(email, firstname, lastname, psw);
-    console.log(errors);
+//regisztráció
+app.post('/api/register', async (req, res) => {
+    try {
+        const { email, firstname, lastname, psw } = req.body;
+        const errors = [];
 
-    if (!validator.isEmail(email)) {
-        errors.push({ error: 'Nem valós email' });
-    }
-
-    if (validator.isEmpty(firstname)) {
-        errors.push({ error: 'Töltsd ki a keresztnevet' });
-    }
-
-    if (validator.isEmpty(lastname)) {
-        errors.push({ error: 'Töltsd ki a vezetéknevet' });
-    }
-
-    if (!validator.isLength(psw, { min: 6 })) {
-        errors.push({ error: 'A jelszónak minimum 6 karakterből kell állnia' });
-    }
-
-    if (errors.length > 0) {
-        return res.status(400).json({ errors });
-    }
-
-    const salt = 10;
-    bcrypt.hash(psw, salt, (err, hash) => {
-        if (err) {
-            return res.status(500).json({ error: 'Hiba a sózáskor' });
+        if (!validator.isEmail(email)) {
+            errors.push({ error: 'Nem valós email' });
+        }
+        if (validator.isEmpty(firstname)) {
+            errors.push({ error: 'Töltsd ki a keresztnevet' });
+        }
+        if (validator.isEmpty(lastname)) {
+            errors.push({ error: 'Töltsd ki a vezetéknevet' });
+        }
+        if (!validator.isLength(psw, { min: 6 })) {
+            errors.push({ error: 'A jelszónak minimum 6 karakterből kell állnia' });
+        }
+        if (errors.length > 0) {
+            return res.status(400).json({ errors });
         }
 
-        const sql = 'INSERT INTO users (email, firstname, lastname, psw, user_picture) VALUES (?, ?, ?, ?, ?)';
-        pool.query(sql, [email, firstname, lastname, hash, 'default.png'], (err2, result) => {
-            if (err2) {
-                return res.status(500).json({ error: 'Az email már foglalt' });
-            }
+        const salt = 10;
+        const hash = await bcrypt.hash(psw, salt);
 
-            res.status(201).json({ message: 'Sikeres regisztráció' });
-        });
-    });
+        const sql = 'INSERT INTO users (email, firstname, lastname, psw, user_picture) VALUES (?, ?, ?, ?, ?)';
+        await pool.execute(sql, [email, firstname, lastname, hash, 'default.png']);
+
+        res.status(201).json({ message: 'Sikeres regisztráció' });
+    } catch (error) {
+        res.status(500).json({ error: 'Az email már foglalt vagy szerverhiba történt' });
+    }
 });
 
 // login
@@ -199,20 +193,19 @@ app.post('/api/logout', authenticateToken, (req, res) => {
 })
 
 // Termék keresése
-app.get('/api/products/:search', (req, res) => {
-    const { search } = req.params;
+app.get('/api/products/:search', async (req, res) => {
+    try {
+        const { search } = req.params;
+        const keres = `%${search}%`;
+        const sql = 'SELECT * FROM products WHERE product_name LIKE ? OR product_price LIKE ? OR product_description LIKE ?';
 
-    const keres = `%${search}%`;
-    const sql = 'SELECT * FROM products WHERE product_name LIKE ? OR product_price LIKE ? OR product_description LIKE ?';
+        const [result] = await pool.execute(sql, [keres, keres, keres]);
 
-    pool.query(sql, [keres, keres, keres], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).send({ error: 'Adatbázis hiba' });
-        }
-
-        res.send(result);
-    });
+        res.json(result);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Adatbázis hiba' });
+    }
 });
 
 // Teszt végpont
@@ -222,143 +215,127 @@ app.get('/api/teszt', authenticateToken, (req, res) => {
 });
 
 // Profil név szerkesztése
-app.put('/api/editProfileName', authenticateToken, (req, res) => {
-    console.log('Token info:', req.user);  // Ellenőrizd, hogy megjelenik-e a token
-    const { firstname, lastname } = req.body;
-    const user_id = req.user.id;
+app.put('/api/editProfileName', authenticateToken, async (req, res) => {
+    try {
+        console.log('Token info:', req.user);
+        const { firstname, lastname } = req.body;
+        const user_id = req.user.id;
 
-    // Ellenőrizzük, hogy legalább az egyik mező (firstname vagy lastname) meg van-e adva
-    if (!firstname && !lastname) {
-        return res.status(400).json({ error: 'Legalább egy névmezőt meg kell adni' });
-    }
-
-    // SQL lekérdezés frissítése firstname és lastname mezőkre
-    const sql = `
-        UPDATE users 
-        SET 
-            firstname = COALESCE(NULLIF(?, ""), firstname),
-            lastname = COALESCE(NULLIF(?, ""), lastname)
-        WHERE user_id = ?
-    `;
-
-    pool.query(sql, [firstname, lastname, user_id], (err, result) => {
-        if (err) {
-            return res.status(500).json({ error: 'Hiba az SQL-ben' });
+        if (!firstname && !lastname) {
+            return res.status(400).json({ error: 'Legalább egy névmezőt meg kell adni' });
         }
+
+        const sql = `
+            UPDATE users 
+            SET 
+                firstname = COALESCE(NULLIF(?, ""), firstname),
+                lastname = COALESCE(NULLIF(?, ""), lastname)
+            WHERE user_id = ?
+        `;
+
+        const [result] = await pool.execute(sql, [firstname, lastname, user_id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Felhasználó nem található' });
         }
 
-        return res.status(200).json({ message: 'Név frissítve' });
-    });
+        res.status(200).json({ message: 'Név frissítve' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Hiba az SQL-ben' });
+    }
 });
-
 
 // Profilkép módosítása
-app.put('/api/editProfilePicture', authenticateToken, upload.single('profile_picture'), (req, res) => {
-    const user_id = req.user.id;
-    const profile_picture = req.file ? req.file.filename : null; // Fájl neve
-    console.log(user_id);
-    console.log(profile_picture);
+app.put('/api/editProfilePicture', authenticateToken, upload.single('profile_picture'), async (req, res) => {
+    try {
+        const user_id = req.user.id;
+        const profile_picture = req.file ? req.file.filename : null;
+        console.log(user_id);
+        console.log(profile_picture);
 
-
-
-    // Ellenőrizzük, hogy van-e fájl
-    if (!profile_picture) {
-        return res.status(400).json({ error: 'Nincs fájl feltöltve' });
-    }
-
-    // SQL lekérdezés a profilkép frissítéséhez
-    const sql = 'UPDATE users SET user_picture = ? WHERE user_id = ?';
-    pool.query(sql, [profile_picture, user_id], (err, result) => {
-        if (err) {
-            console.error('SQL hiba:', err);
-            return res.status(500).json({ error: 'Hiba a profilkép frissítésekor' });
+        if (!profile_picture) {
+            return res.status(400).json({ error: 'Nincs fájl feltöltve' });
         }
+
+        const sql = 'UPDATE users SET user_picture = ? WHERE user_id = ?';
+        const [result] = await pool.execute(sql, [profile_picture, user_id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Felhasználó nem található' });
         }
 
-        return res.status(200).json({ message: 'Profilkép sikeresen frissítve', profile_picture });
-    });
+        res.status(200).json({ message: 'Profilkép sikeresen frissítve', profile_picture });
+    } catch (error) {
+        console.error('SQL hiba:', error);
+        res.status(500).json({ error: 'Hiba a profilkép frissítésekor' });
+    }
 });
-
-
-
 
 // Jelszó módosítása
-app.put('/api/editProfilePsw', authenticateToken, (req, res) => {
-    const psw = req.body.psw;
-    const user_id = req.user.id;
-    console.log(psw);
-    console.log(user_id);
+app.put('/api/editProfilePsw', authenticateToken, async (req, res) => {
+    try {
+        const psw = req.body.psw;
+        const user_id = req.user.id;
+        console.log(psw);
+        console.log(user_id);
 
-
-
-    const salt = 10;
-
-    if (psw === '' && !validator.isLength(psw, { min: 6 })) {
-        return res.status(400).json({ error: 'A jelszónak min 6 karakterből kell állnia' });
-    }
-
-    bcrypt.hash(psw, salt, (err, hash) => {
-        if (err) {
-            return res.status(500).json({ error: 'Hiba a sózáskor' });
+        if (!psw || !validator.isLength(psw, { min: 6 })) {
+            return res.status(400).json({ error: 'A jelszónak minimum 6 karakterből kell állnia' });
         }
 
-        const sql = 'UPDATE users SET psw = COALESCE(NULLIF(?, ""), psw) WHERE user_id = ?';
+        const salt = 10;
+        const hash = await bcrypt.hash(psw, salt);
 
-        pool.query(sql, [hash, user_id], (err, result) => {
-            if (err) {
-                return res.status(500).json({ error: 'Hiba az SQL-ben' });
-            }
+        const sql = 'UPDATE users SET psw = ? WHERE user_id = ?';
+        const [result] = await pool.execute(sql, [hash, user_id]);
 
-            return res.status(200).json({ message: 'Jelszó frissítve ' });
-        });
-    });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Felhasználó nem található' });
+        }
+
+        res.status(200).json({ message: 'Jelszó frissítve' });
+    } catch (error) {
+        console.error('SQL hiba:', error);
+        res.status(500).json({ error: 'Hiba az SQL-ben' });
+    }
 });
 
-
 // Termék feltöltése (csak adminok számára)
-app.post('/api/upload', authenticateToken, authorizeAdmin, upload.single('product_image'), (req, res) => {
-    const { product_name, product_price, product_stock, product_description } = req.body;
-    const product_image = req.file ? req.file.filename : null;
+app.post('/api/upload', authenticateToken, authorizeAdmin, upload.single('product_image'), async (req, res) => {
+    try {
+        const { product_name, product_price, product_stock, product_description } = req.body;
+        const product_image = req.file ? req.file.filename : null;
 
-    // Validáció
-    if (!product_name || !product_price || !product_stock || !product_image || !product_description) {
-        return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
-    }
-
-    if (isNaN(product_price) || isNaN(product_stock) || product_stock < 0) {
-        return res.status(400).json({ error: 'Érvénytelen ár vagy készlet' });
-    }
-
-    // Termék beszúrása az adatbázisba
-    const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, product_price, product_stock, product_description) VALUES (?, ?, ?, ?, ?)';
-    pool.query(sqlInsertProduct, [product_name, product_image, product_price, product_stock, product_description], (err, result) => {
-        if (err) {
-            console.error('Hiba az SQL-ben:', err);
-            return res.status(500).json({ error: 'Hiba az SQL-ben', details: err.message });
+        if (!product_name || !product_price || !product_stock || !product_image || !product_description) {
+            return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
         }
 
+        if (isNaN(product_price) || isNaN(product_stock) || product_stock < 0) {
+            return res.status(400).json({ error: 'Érvénytelen ár vagy készlet' });
+        }
+
+        const sqlInsertProduct = 'INSERT INTO products (product_name, product_image, product_price, product_stock, product_description) VALUES (?, ?, ?, ?, ?)';
+        const [result] = await pool.execute(sqlInsertProduct, [product_name, product_image, product_price, product_stock, product_description]);
+
         res.status(201).json({ message: 'Termék feltöltve', product_id: result.insertId });
-    });
+    } catch (error) {
+        console.error('Hiba az SQL-ben:', error);
+        res.status(500).json({ error: 'Hiba az SQL-ben', details: error.message });
+    }
 });
 
 // Termékek listázása
-app.get('/api/products', (req, res) => {
-    const sql = 'SELECT * FROM products';
-
-    pool.query(sql, (err, result) => {
-        if (err) {
-            console.error('Hiba a termékek lekérdezésekor:', err);
-            return res.status(500).json({ error: 'Hiba a termékek lekérdezésekor' });
-        }
+app.get('/api/products', async (req, res) => {
+    try {
+        const sql = 'SELECT * FROM products';
+        const [result] = await pool.execute(sql);
 
         res.status(200).json(result);
-    });
+    } catch (error) {
+        console.error('Hiba a termékek lekérdezésekor:', error);
+        res.status(500).json({ error: 'Hiba a termékek lekérdezésekor' });
+    }
 });
 
 /*
