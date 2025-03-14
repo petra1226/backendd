@@ -173,7 +173,16 @@ app.post('/api/login', async (req, res) => {
 
         const token = jwt.sign({ id: user.user_id }, JWT_SECRET, { expiresIn: '1y' });
 
-        return res.json({ message: 'Sikeres bejelentkezés', token });
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            domain: 'revyn.netlify.app',
+            path: '/',
+            maxAge: 3600000 * 24 * 31 * 11
+        });
+
+        return res.json({ message: 'Sikeres bejelentkezés' });
 
     } catch (error) {
         console.error("Hiba a bejelentkezés során:", error);
@@ -187,6 +196,8 @@ app.post('/api/logout', authenticateToken, (req, res) => {
         httpOnly: true,
         secure: true,
         sameSite: 'lax',
+        domain: 'revyn.netlify.app',
+        path: '/',
     });
 
     res.status(200).json({ message: "Sikeres kijelentkezés" });
