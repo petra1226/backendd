@@ -459,41 +459,71 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
     const user_id = req.user.id;
     const { first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart } = req.body;
 
+    // Ellenőrizzük, hogy minden érték létezik-e
     if (!Array.isArray(cart) || cart.length === 0) {
         return res.status(400).json({ error: "A kosár tartalma hiányzik vagy nem megfelelő formátumú." });
     }
 
-    let connection = null;  // Biztosítjuk, hogy a connection mindig definiált legyen
+    // Debugging: Loggoljuk ki a bejövő adatokat
+    console.log("Rendelés adatai:", {
+        user_id,
+        first_name,
+        last_name,
+        address,
+        phone_number,
+        card_number,
+        expiration_date,
+        name_on_card,
+        cart
+    });
+
+    let connection = null;
 
     try {
-        connection = await pool.getConnection();  // Kapcsolat lekérése
+        connection = await pool.getConnection();
         if (!connection) {
             throw new Error("Nem sikerült adatbáziskapcsolatot létesíteni.");
         }
 
-        await connection.beginTransaction();  // Tranzakció indítása
+        await connection.beginTransaction();
 
         // Rendelés teljes összegének kiszámítása
         let total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+        // **NULL kezelés:** Ha egy érték `undefined`, állítsuk `null`-ra
+        const orderValues = [
+            user_id || null,
+            total || 0.00,
+            first_name || null,
+            last_name || null,
+            address || null,
+            phone_number || null,
+            card_number || null,
+            expiration_date || null,
+            name_on_card || null
+        ];
 
         // 1. Lépés: Rendelés beszúrása az `orders` táblába
         const [orderResult] = await connection.execute(
             `INSERT INTO orders (user_id, total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [user_id, total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card]
+            orderValues
         );
         const order_id = orderResult.insertId;
 
         // 2. Lépés: Kosár tételeinek beszúrása az `order_items` táblába
         let first_order_item_id = null;
         for (let item of cart) {
+            if (!item.product_id || !item.quantity || !item.price) {
+                throw new Error("A kosár egyik eleme hibás adatokat tartalmaz.");
+            }
+
             const [orderItemResult] = await connection.execute(
                 `INSERT INTO order_items (product_id, quantity, price) VALUES (?, ?, ?)`,
                 [item.product_id, item.quantity, item.price]
             );
             const order_item_id = orderItemResult.insertId;
 
-            // Az első order_item_id mentése
             if (!first_order_item_id) {
                 first_order_item_id = order_item_id;
             }
@@ -507,24 +537,19 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
             );
         }
 
-        await connection.commit(); // Tranzakció véglegesítése
+        await connection.commit();
         res.json({ message: "Rendelés sikeresen rögzítve!", order_id, total });
 
     } catch (error) {
-        if (connection) {
-            await connection.rollback(); // Hibakezelés: visszavonás
-        }
+        if (connection) await connection.rollback();
         console.error("Hiba a rendelés rögzítésénél:", error);
 
-        // Fontos: Csak egyszer küldünk választ!
         if (!res.headersSent) {
             res.status(500).json({ error: "Hiba történt a rendelés rögzítése közben." });
         }
 
     } finally {
-        if (connection) {
-            connection.release(); // Kapcsolat visszaadása a pool-ba
-        }
+        if (connection) connection.release();
     }
 });
 
