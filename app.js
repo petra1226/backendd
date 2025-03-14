@@ -105,7 +105,7 @@ function authorizeAdmin(req, res, next) {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(limiter);
+//app.use(limiter);
 app.use(cookieParser());
 app.use(cors({
     origin: 'https://revyn.netlify.app',
@@ -460,7 +460,8 @@ app.post('/api/orders/', authenticateToken, (req, res) => {
 
     // Kiolvassuk a többi adatot a body-ból
     const { total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart } = req.body;
-
+    console.log(total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart);
+    
     // Ellenőrizzük, hogy a cart valóban egy tömb
     if (!Array.isArray(cart) || cart.length === 0) {
         return res.status(400).json({ error: "A kosár tartalma hiányzik vagy nem megfelelő formátumú." });
