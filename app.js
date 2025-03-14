@@ -201,7 +201,7 @@ app.post('/api/login', (req, res) => {
                 res.cookie('auth_token', token, {
                     httpOnly: true,
                     secure: true,
-                    sameSite: 'none',
+                    sameSite: 'lax',
                     maxAge: 1000 * 60 * 60 * 24 * 10
                 });
 
@@ -217,6 +217,17 @@ app.post('/api/login', (req, res) => {
         });
     });
 });
+
+// logout
+app.post('/api/logout', authenticateToken, (req, res) => {
+    res.clearCookie('auth_token', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+    });
+
+    res.status(200).json({ message: "Sikeres kijelentkezés" });
+})
 
 // Termék keresése
 app.get('/api/products/:search', (req, res) => {
