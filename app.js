@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 const validator = require('validator');
 const fs = require('fs');
 const path = require('path');
@@ -480,7 +480,7 @@ app.post('/api/orders/', authenticateToken, async(req, res) => {
 
     let connection;
     try {
-        connection = await pool.getConnection();  // Poolból kapcsolat lekérése
+        connection = await pool.getConnection();  // Kapcsolat lekérése
         await connection.beginTransaction();  // Tranzakció indítása
 
         // Rendelés teljes összegének kiszámítása
@@ -522,8 +522,6 @@ app.post('/api/orders/', authenticateToken, async(req, res) => {
 
     // Példa: Rendelések mentése adatbázisba (MongoDB, MySQL, stb.)
     // db.saveOrder({ user_id, total, first_name, last_name, address, phone_number, cart });
-
-    return res.json({ message: "Rendelés sikeresen rögzítve!", order_items: cart.length });
 });
 
 
