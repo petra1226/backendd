@@ -503,6 +503,56 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
     }
 });
 
+// rendelések lekérdezése
+app.get('/api/orders', authenticateToken, async (req, res) => {
+    try {
+        const sql = `
+            SELECT 
+                o.order_id,
+                o.user_id,
+                o.total,
+                o.order_date,
+                o.first_name,
+                o.last_name,
+                o.address,
+                o.phone_number,
+                o.card_number,
+                o.expiration_date,
+                o.name_on_card,
+                GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'order_item_id', oi.order_item_id,
+                        'product_id', p.product_id,
+                        'product_name', p.product_name,
+                        'quantity', oi.quantity,
+                        'price', oi.price,
+                        'product_price', p.product_price,
+                        'product_stock', p.product_stock,
+                        'product_image', p.product_image,
+                        'product_description', p.product_description
+                    )
+                ) AS order_items
+            FROM orders o
+            JOIN order_items oi ON o.order_id = oi.order_id
+            JOIN products p ON oi.product_id = p.product_id
+            GROUP BY o.order_id;
+        `;
+
+        const [orders] = await pool.execute(sql);
+
+        // JSON-ként formázott `order_items` visszaalakítása
+        const formattedOrders = orders.map(order => ({
+            ...order,
+            order_items: JSON.parse(`[${order.order_items}]`) // JSON stringet tömbbé alakítunk
+        }));
+
+        res.json(formattedOrders);
+    } catch (error) {
+        console.error('Hiba a rendelések lekérdezésekor:', error);
+        res.status(500).json({ error: 'Hiba a rendelések lekérdezésekor' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`IP: https://${HOSTNAME}  || PORT: ${PORT}`);
 });
