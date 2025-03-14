@@ -160,62 +160,31 @@ app.post('/api/register', (req, res) => {
 });
 
 // login
-app.post('/api/login', (req, res) => {
-    const { email, psw } = req.body;
-    const errors = [];
-    console.log(email, psw);
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, psw } = req.body;
 
-    if (!validator.isEmail(email)) {
-        errors.push({ error: 'Add meg az email címet ' });
-    }
+        const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
 
-    if (validator.isEmpty(psw)) {
-        errors.push({ error: 'Add meg a jelszót' });
-    }
-
-    if (errors.length > 0) {
-        return res.status(400).json({ errors });
-    }
-
-    const sql = 'SELECT * FROM users WHERE email LIKE ?';
-    pool.query(sql, [email], (err, result) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({ error: 'Hiba az SQL-ben' });
-        }
-
-        if (result.length === 0) {
+        if (users.length === 0) {
             return res.status(404).json({ error: 'A felhasználó nem található' });
         }
 
-        const user = result[0];
-        const is_admin = user.is_admin;
-        console.log(`Admin-e: ${is_admin}`);
+        const user = users[0];
+        const isMatch = await bcrypt.compare(psw, user.psw);
 
-        console.log(user);
-        bcrypt.compare(psw, user.psw, (err, isMatch) => {
-            if (isMatch) {
-                const token = jwt.sign({ id: user.user_id }, JWT_SECRET, { expiresIn: '1y' });
-                console.log(token);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Rossz a jelszó' });
+        }
 
-                res.cookie('auth_token', token, {
-                    httpOnly: true,
-                    secure: true,
-                    sameSite: 'lax',
-                    maxAge: 1000 * 60 * 60 * 24 * 10
-                });
+        const token = jwt.sign({ id: user.user_id }, JWT_SECRET, { expiresIn: '1y' });
 
-                // Ellenőrizzük, hogy a felhasználó admin-e
-                if (is_admin === 1) {
-                    return res.status(200).json({ message: 'Sikeres bejelentkezés adminként', is_admin });
-                } else {
-                    return res.status(200).json({ message: 'Sikeres bejelentkezés', is_admin });
-                }
-            } else {
-                return res.status(401).json({ error: 'Rossz a jelszó' });
-            }
-        });
-    });
+        return res.json({ message: 'Sikeres bejelentkezés', token });
+
+    } catch (error) {
+        console.error("Hiba a bejelentkezés során:", error);
+        return res.status(500).json({ error: 'Szerverhiba történt' });
+    }
 });
 
 // logout
