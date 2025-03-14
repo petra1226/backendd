@@ -67,7 +67,7 @@ const upload = multer({
 const JWT_SECRET = process.env.JWT_SECRET;
 function authenticateToken(req, res, next) {
     const token = req.cookies.auth_token;
-    console.log(token);
+    //console.log(token);
 
     if (!token) {
         return res.status(403).json({ error: 'Nincsen tokened' });
@@ -462,7 +462,7 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             orderValues
         );
-        const order_id = orderResult.insertId;
+        const order_id = orderResult.insertId; // 🔥 Megkapjuk az újonnan beszúrt rendelés ID-ját
 
         // 🔄 **3. Lépés: Termékek beszúrása az `order_items` táblába a megfelelő `order_id`-val**
         for (let item of cart) {
