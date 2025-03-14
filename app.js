@@ -108,9 +108,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
 app.use(cookieParser());
 app.use(cors({
-    origin:'https://revyn.netlify.app',
-    credentials: true, 
-    
+    origin: 'https://revyn.netlify.app',
+    credentials: true,
+
 }));
 
 app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uploads')));
@@ -119,7 +119,7 @@ app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uplo
 app.post('/api/register', (req, res) => {
     const { email, firstname, lastname, psw } = req.body;
     const errors = [];
-    console.log(email, firstname, lastname, psw );
+    console.log(email, firstname, lastname, psw);
     console.log(errors);
 
     if (!validator.isEmail(email)) {
@@ -187,17 +187,17 @@ app.post('/api/login', (req, res) => {
         if (result.length === 0) {
             return res.status(404).json({ error: 'A felhasználó nem található' });
         }
-        
+
         const user = result[0];
         const is_admin = user.is_admin;
         console.log(`Admin-e: ${is_admin}`);
-        
+
         console.log(user);
         bcrypt.compare(psw, user.psw, (err, isMatch) => {
             if (isMatch) {
                 const token = jwt.sign({ id: user.user_id }, JWT_SECRET, { expiresIn: '1y' });
                 console.log(token);
-                
+
                 res.cookie('auth_token', token, {
                     httpOnly: true,
                     secure: true,
@@ -209,7 +209,7 @@ app.post('/api/login', (req, res) => {
                 if (is_admin === 1) {
                     return res.status(200).json({ message: 'Sikeres bejelentkezés adminként', is_admin });
                 } else {
-                    return res.status(200).json({ message: 'Sikeres bejelentkezés', is_admin }); 
+                    return res.status(200).json({ message: 'Sikeres bejelentkezés', is_admin });
                 }
             } else {
                 return res.status(401).json({ error: 'Rossz a jelszó' });
@@ -343,11 +343,11 @@ app.put('/api/editProfilePsw', authenticateToken, (req, res) => {
 
 // Termék feltöltése (csak adminok számára)
 app.post('/api/upload', authenticateToken, authorizeAdmin, upload.single('product_image'), (req, res) => {
-    const { product_name, product_price, product_stock, product_description } = req.body; 
+    const { product_name, product_price, product_stock, product_description } = req.body;
     const product_image = req.file ? req.file.filename : null;
 
     // Validáció
-    if (!product_name || !product_price || !product_stock || !product_image || !product_description) { 
+    if (!product_name || !product_price || !product_stock || !product_image || !product_description) {
         return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
     }
 
@@ -381,6 +381,7 @@ app.get('/api/products', (req, res) => {
     });
 });
 
+/*
 // Kosárba helyezés
 app.post('/api/cart/:product_id', authenticateToken, (req, res) => {
     const user_id = req.user.id;
@@ -451,6 +452,39 @@ function addToCart(cart_id, product_id, res) {
         }
     });
 }
+*/
+
+//rendelés rögzítése
+app.post('/api/orders/', authenticateToken, (req, res) => {
+    const user_id = req.user.id;
+
+    // Kiolvassuk a többi adatot a body-ból
+    const { total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart } = req.body;
+
+    // Ellenőrizzük, hogy a cart valóban egy tömb
+    if (!Array.isArray(cart) || cart.length === 0) {
+        return res.status(400).json({ error: "A kosár tartalma hiányzik vagy nem megfelelő formátumú." });
+    }
+
+    console.log("Beérkezett rendelési adatok:", {
+        user_id,
+        total,
+        first_name,
+        last_name,
+        address,
+        phone_number,
+        card_number, // Biztonsági okokból ne loggoljuk ki!
+        expiration_date,
+        name_on_card,
+        cart
+    });
+
+    // Példa: Rendelések mentése adatbázisba (MongoDB, MySQL, stb.)
+    // db.saveOrder({ user_id, total, first_name, last_name, address, phone_number, cart });
+
+    return res.json({ message: "Rendelés sikeresen rögzítve!", order_items: cart.length });
+});
+
 
 app.listen(PORT, () => {
     console.log(`IP: https://${HOSTNAME}  || PORT: ${PORT}`);
