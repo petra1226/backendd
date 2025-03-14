@@ -459,23 +459,9 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
     const user_id = req.user.id;
     const { first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart } = req.body;
 
-    // Ellenőrizzük, hogy minden érték létezik-e
     if (!Array.isArray(cart) || cart.length === 0) {
         return res.status(400).json({ error: "A kosár tartalma hiányzik vagy nem megfelelő formátumú." });
     }
-
-    // Debugging: Loggoljuk ki a bejövő adatokat
-    console.log("Rendelés adatai:", {
-        user_id,
-        first_name,
-        last_name,
-        address,
-        phone_number,
-        card_number,
-        expiration_date,
-        name_on_card,
-        cart
-    });
 
     let connection = null;
 
@@ -487,10 +473,9 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
 
         await connection.beginTransaction();
 
-        // Rendelés teljes összegének kiszámítása
+        // 🏷️ **1. Lépés: Rendelés teljes összegének kiszámítása**
         let total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-        // **NULL kezelés:** Ha egy érték `undefined`, állítsuk `null`-ra
         const orderValues = [
             user_id || null,
             total || 0.00,
@@ -503,7 +488,7 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
             name_on_card || null
         ];
 
-        // 1. Lépés: Rendelés beszúrása az `orders` táblába
+        // 📝 **2. Lépés: Rendelés beszúrása az `orders` táblába**
         const [orderResult] = await connection.execute(
             `INSERT INTO orders (user_id, total, first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -511,16 +496,26 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
         );
         const order_id = orderResult.insertId;
 
-        // 2. Lépés: Kosár tételeinek beszúrása az `order_items` táblába
+        // 🔄 **3. Lépés: Product ID-k lekérése a nevek alapján**
         let first_order_item_id = null;
+
         for (let item of cart) {
-            if (!item.product_id || !item.quantity || !item.price) {
-                throw new Error("A kosár egyik eleme hibás adatokat tartalmaz.");
+            // 🔍 **Lekérjük az azonosítót a termék nevéből**
+            const [product] = await connection.execute(
+                `SELECT product_id FROM products WHERE product_name = ? LIMIT 1`,
+                [item.name]
+            );
+
+            if (product.length === 0) {
+                throw new Error(`Nem található termék a következő névvel: ${item.name}`);
             }
 
+            const product_id = product[0].product_id;
+
+            // 🛒 **4. Lépés: Termékek beszúrása az `order_items` táblába**
             const [orderItemResult] = await connection.execute(
                 `INSERT INTO order_items (product_id, quantity, price) VALUES (?, ?, ?)`,
-                [item.product_id, item.quantity, item.price]
+                [product_id, item.quantity, item.price]
             );
             const order_item_id = orderItemResult.insertId;
 
@@ -529,7 +524,7 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
             }
         }
 
-        // 3. Lépés: Az orders táblában frissítjük az order_item_id mezőt
+        // 🔗 **5. Lépés: Az orders táblában frissítjük az order_item_id mezőt**
         if (first_order_item_id) {
             await connection.execute(
                 `UPDATE orders SET order_item_id = ? WHERE order_id = ?`,
@@ -541,7 +536,9 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
         res.json({ message: "Rendelés sikeresen rögzítve!", order_id, total });
 
     } catch (error) {
-        if (connection) await connection.rollback();
+        if (connection) {
+            await connection.rollback();
+        }
         console.error("Hiba a rendelés rögzítésénél:", error);
 
         if (!res.headersSent) {
