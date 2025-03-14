@@ -464,9 +464,7 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
         );
         const order_id = orderResult.insertId;
 
-        // 🔄 **3. Lépés: Product ID-k lekérése a nevek alapján**
-        let first_order_item_id = null;
-
+        // 🔄 **3. Lépés: Termékek beszúrása az `order_items` táblába a megfelelő `order_id`-val**
         for (let item of cart) {
             // 🔍 **Lekérjük az azonosítót a termék nevéből**
             const [product] = await connection.execute(
@@ -480,23 +478,10 @@ app.post('/api/orders/', authenticateToken, async (req, res) => {
 
             const product_id = product[0].product_id;
 
-            // 🛒 **4. Lépés: Termékek beszúrása az `order_items` táblába**
-            const [orderItemResult] = await connection.execute(
-                `INSERT INTO order_items (product_id, quantity, price) VALUES (?, ?, ?)`,
-                [product_id, item.quantity, item.price]
-            );
-            const order_item_id = orderItemResult.insertId;
-
-            if (!first_order_item_id) {
-                first_order_item_id = order_item_id;
-            }
-        }
-
-        // 🔗 **5. Lépés: Az orders táblában frissítjük az order_item_id mezőt**
-        if (first_order_item_id) {
+            // 🛒 **4. Lépés: Termékek beszúrása az `order_items` táblába a megfelelő `order_id`-val**
             await connection.execute(
-                `UPDATE orders SET order_item_id = ? WHERE order_id = ?`,
-                [first_order_item_id, order_id]
+                `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)`,
+                [order_id, product_id, item.quantity, item.price]
             );
         }
 
