@@ -196,8 +196,8 @@ app.post('/api/logout', authenticateToken, (req, res) => {
         httpOnly: true,
         secure: true,
         sameSite: 'lax',
-        domain: 'revyn.netlify.app',
-        path: '/',
+        // domain: 'revyn.netlify.app',
+        // path: '/',
     });
 
     res.status(200).json({ message: "Sikeres kijelentkezés" });
