@@ -117,7 +117,7 @@ app.use(cors({
 
 }));
 
-app.use('/uploads', authenticateToken, express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 //regisztráció
 app.post('/api/register', async (req, res) => {
