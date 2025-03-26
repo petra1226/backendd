@@ -220,6 +220,18 @@ app.get('/api/products/:search', async (req, res) => {
     }
 });
 
+// Egy termékről minden infó
+app.get('/api/product/:product_id', authenticateToken, async (req, res) => {
+    const { product_id } = req.params;
+    console.log(product_id);
+    
+    const sql = 'SELECT * FROM products WHERE product_id = ?';
+    const [result] = await pool.execute(sql, [product_id]);
+    console.log(result);
+
+    res.status(200).json(result);
+});
+
 // Teszt végpont
 app.get('/api/teszt', authenticateToken, (req, res) => {
     const user = req.user;
