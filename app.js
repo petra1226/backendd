@@ -211,7 +211,8 @@ app.get('/api/products/:search', async (req, res) => {
         const sql = 'SELECT * FROM products WHERE product_name LIKE ? OR product_price LIKE ? OR product_description LIKE ?';
 
         const [result] = await pool.execute(sql, [keres, keres, keres]);
-
+        console.log(result);
+        
         res.json(result);
     } catch (error) {
         console.error(error);
