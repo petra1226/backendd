@@ -362,6 +362,106 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
+// Termék törlése (csak adminok számára)
+app.delete('/api/products/:product_id', authenticateToken, authorizeAdmin, async (req, res) => {
+    try {
+        const { product_id } = req.params;
+
+        // Ellenőrizzük, hogy a termék létezik-e
+        const [productCheck] = await pool.execute('SELECT * FROM products WHERE product_id = ?', [product_id]);
+        if (productCheck.length === 0) {
+            return res.status(404).json({ error: 'Termék nem található' });
+        }
+
+        // Töröljük a termékhez tartozó képet (ha nem a default.png)
+        const productImage = productCheck[0].product_image;
+        if (productImage !== 'default.png') {
+            const imagePath = path.join(__dirname, 'uploads', productImage);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
+        }
+
+        // Töröljük a terméket
+        await pool.execute('DELETE FROM products WHERE product_id = ?', [product_id]);
+
+        res.status(200).json({ message: 'Termék sikeresen törölve' });
+    } catch (error) {
+        console.error('Hiba a termék törlésekor:', error);
+        res.status(500).json({ error: 'Hiba a termék törlésekor' });
+    }
+});
+
+// Termék szerkesztése (csak adminok számára)
+app.put('/api/products/:product_id', authenticateToken, authorizeAdmin, upload.single('product_image'), async (req, res) => {
+    try {
+        const { product_id } = req.params;
+        const { product_name, product_price, product_stock, product_description } = req.body;
+        const product_image = req.file ? req.file.filename : null;
+
+        // Ellenőrizzük, hogy a termék létezik-e
+        const [productCheck] = await pool.execute('SELECT * FROM products WHERE product_id = ?', [product_id]);
+        if (productCheck.length === 0) {
+            return res.status(404).json({ error: 'Termék nem található' });
+        }
+
+        // Ellenőrizzük az inputokat
+        if (!product_name || !product_price || !product_stock || !product_description) {
+            return res.status(400).json({ error: 'Minden mezőt ki kell tölteni' });
+        }
+
+        if (isNaN(product_price) || isNaN(product_stock) || product_stock < 0) {
+            return res.status(400).json({ error: 'Érvénytelen ár vagy készlet' });
+        }
+
+        // Ha új kép lett feltöltve, töröljük a régit (ha nem a default.png)
+        const oldImage = productCheck[0].product_image;
+        if (product_image && oldImage !== 'default.png') {
+            const oldImagePath = path.join(__dirname, 'uploads', oldImage);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
+
+        // Frissítjük a terméket
+        const sql = `
+            UPDATE products 
+            SET 
+                product_name = ?,
+                product_price = ?,
+                product_stock = ?,
+                product_description = ?,
+                product_image = COALESCE(?, product_image)
+            WHERE product_id = ?
+        `;
+        await pool.execute(sql, [
+            product_name,
+            product_price,
+            product_stock,
+            product_description,
+            product_image,
+            product_id
+        ]);
+
+        res.status(200).json({ message: 'Termék sikeresen frissítve' });
+    } catch (error) {
+        console.error('Hiba a termék frissítésekor:', error);
+        res.status(500).json({ error: 'Hiba a termék frissítésekor' });
+    }
+});
+
+// Összes termék lekérése (admin felülethez)
+app.get('/api/admin/products', authenticateToken, authorizeAdmin, async (req, res) => {
+    try {
+        const sql = 'SELECT * FROM products ORDER BY product_id DESC';
+        const [products] = await pool.execute(sql);
+        res.status(200).json(products);
+    } catch (error) {
+        console.error('Hiba a termékek lekérdezésekor:', error);
+        res.status(500).json({ error: 'Hiba a termékek lekérdezésekor' });
+    }
+});
+
 
 
 //rendelés rögzítése
