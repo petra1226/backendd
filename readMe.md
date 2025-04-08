@@ -73,7 +73,7 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
 
 # Admin funkciók
 - Az admin funkciókhoz (/api/upload, /api/products/:product_id, /api/admin/products) mindkét jogosultság szükséges:
-    1. Érvényes JWT token
-    2. Admin jogosultság (users.is_admin = 1)
+    - Érvényes JWT token
+    - Admin jogosultság (users.is_admin = 1)
 
 
