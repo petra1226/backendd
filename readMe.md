@@ -20,6 +20,7 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
         - cors - Cross-Origin Resource Sharing
         - cookie-parser - cookie kezelés
 
+![]
 
 # API Végpontok
 
@@ -76,4 +77,41 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
     - Érvényes JWT token
     - Admin jogosultság (users.is_admin = 1)
 
+## Használ package-ek
+- bcrypt
+- cookie-parser
+- cors
+- dotenv
+- express
+- express-rate-limit
+- jsonwebtoken
+- multer
+- mysql
+- path
+- validator
+- nodemon
+
+
+```javascript
+"dependencies": {
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "cars": "^1.1.6",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "fs": "^0.0.1-security",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql": "^2.18.1",
+    "mysql2": "^3.12.0",
+    "path": "^0.12.7",
+    "validator": "^13.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+```
 
