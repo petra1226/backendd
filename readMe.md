@@ -1,14 +1,14 @@
-# Áttekintés
+## Áttekintés
 Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js keretrendszerrel készült, MySQL adatbázist használ, és RESTful végpontokat biztosít a felhasználói hitelesítéstől a termékkezelésig.
 
-# Főbb jellemzők
+## Főbb jellemzők
 - Felhasználókezelés (regisztráció, bejelentkezés, profil szerkesztés)
 - Termékkezelés (feltöltés, keresés, módosítás, törlés)
 - Rendeléskezelés (rendelés rögzítése, rendelések listázása)
 - Adminisztrációs funkciók (csak admin jogosultsággal)
 - Képfeltöltés támogatása
 
-# Technológiai verem
+## Technológiai verem
 - Backend: Node.js, Express.js
 - Adatbázis: MySQL
 - Hitelesítés: JWT (JSON Web Token)
@@ -44,7 +44,7 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
         - Mindegyik végponthoz hitelesítés szükséges
 
 
-# Termékkezelés
+## Termékkezelés
 1. Termékek listázása
     - GET /api/products
 2. Termék keresése
@@ -62,7 +62,7 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
 6. Termék törlése (csak admin)
     - DELETE /api/products/:product_id
 
-# Rendeléskezelés
+## Rendeléskezelés
 1. Rendelés létrehozása
     - POST /api/orders/
     - Szükséges adatok: first_name, last_name, address, phone_number, card_number, expiration_date, name_on_card, cart (tömb)
@@ -72,7 +72,7 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
     - GET /api/orders
     - Hitelesítés szükséges
 
-# Admin funkciók
+## Admin funkciók
 - Az admin funkciókhoz (/api/upload, /api/products/:product_id, /api/admin/products) mindkét jogosultság szükséges:
     - Érvényes JWT token
     - Admin jogosultság (users.is_admin = 1)
@@ -114,4 +114,11 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
     "nodemon": "^3.1.9"
   }
 ```
+
+## Biztonsági megfontolások
+- Minden jelszó bcrypt-el van titkosítva
+- JWT token használata hitelesítéshez
+- Rate limiting beállítva (jelenleg kikapcsolva)
+- CORS korlátozva a revyn.netlify.app domainre
+- HTTP-only, secure cookie-k használata
 
