@@ -77,4 +77,3 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
     2. Admin jogosultság (users.is_admin = 1)
 
 
-https://documenter.getpostman.com/view/38557569/2sB2cVfhfh
