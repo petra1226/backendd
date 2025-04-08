@@ -22,7 +22,7 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
 
 ![]
 
-# API Végpontok
+## API Végpontok
 
 ### Felhasználókezelés
    1. Regisztráció
