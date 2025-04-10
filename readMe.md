@@ -77,6 +77,44 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
     - Érvényes JWT token
     - Admin jogosultság (users.is_admin = 1)
 
+
+## Adatbázis
+- orders
+    - order_id
+    - user_id
+    - total
+    - order_date
+    - first_name
+    - last_name
+    - address
+    - phone_number
+    - card_number
+    - expiration_date
+    - name_on_card
+- order_items
+    - order_item_id
+    - order_id
+    - product_id
+    - quantity
+    - price
+- products
+    - product_id
+    - product_name
+    - product_price
+    - product_stock
+    - product_image
+    - product_description
+- users
+    - user_id
+    - email
+    - firstname
+    - lastname
+    - user_picture
+    - psw
+    - is_admin
+
+
+
 ## Használ package-ek
 - bcrypt
 - cookie-parser
