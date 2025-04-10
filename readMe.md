@@ -117,14 +117,18 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
 
 ## Használ package-ek
 - bcrypt
+- bcryptjs
+- cars
 - cookie-parser
 - cors
 - dotenv
 - express
 - express-rate-limit
+- fs
 - jsonwebtoken
 - multer
 - mysql
+- mysql2
 - path
 - validator
 - nodemon
@@ -160,3 +164,9 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
 - CORS korlátozva a revyn.netlify.app domainre
 - HTTP-only, secure cookie-k használata
 
+## Linkek
+- [Deepseek](https://chat.deepseek.com)
+- [Github](https://github.com/petra1226/backendd) 
+- [W3schools](https://www.w3schools.com)
+- [Postman](https://www.postman.com)
+- [phpMyAdmin](http://localhost/phpmyadmin/index.php)
