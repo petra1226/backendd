@@ -112,7 +112,7 @@ Ez a dokumentáció a Revyn webshop backend API-ját írja le, amely Express.js 
     - psw
     - is_admin
 
-![tablázat](https://drawsql.app/teams/poka-veronika/diagrams/revyn)
+![táblázat](https://snipboard.io/v6f2kT.jpg)
 
 
 ## Használ package-ek
